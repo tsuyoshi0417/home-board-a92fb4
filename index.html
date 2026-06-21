@@ -208,7 +208,7 @@
     <details id="card-fold" class="fold hidden">
       <summary>内訳を見る<span class="chev">▼</span></summary>
       <div class="body">
-        <div class="row"><span>今月の予算</span><span class="v" id="f-budget">¥0</span></div>
+        <div class="row"><span>この期の予算</span><span class="v" id="f-budget">¥0</span></div>
         <div class="row"><span>これまで使った</span><span class="v" id="f-spent">¥0</span></div>
         <div id="f-bars"></div>
       </div>
@@ -308,6 +308,15 @@ function render(s){
 
   // 更新表記（全カード共通で使う）
   const fr = freshness(s.generatedAt);
+
+  // 期の見出し（締め日ベース・例「6/24までの家計」）。古いdata.json（cycleLabel無し）は従来文言。
+  const cycleLabel = (typeof s.cycleLabel === "string" && s.cycleLabel) ? s.cycleLabel : "今月";
+  const leadEl = document.querySelector("#card-remain .lead");
+  if(leadEl) leadEl.textContent = cycleLabel + "、あと";
+  const overLeadEl = document.querySelector("#card-over .lead");
+  if(overLeadEl) overLeadEl.textContent = cycleLabel + "は予算を";
+  const nobudgetT1 = document.querySelector("#card-nobudget .t1");
+  if(nobudgetT1) nobudgetT1.textContent = cycleLabel + "の予算がまだ入っていません";
 
   // --- 分岐：予算未設定 / マイナス / 通常 ---
   const remainCard = $("card-remain");
