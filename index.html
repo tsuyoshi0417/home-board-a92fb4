@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>今月の家計</title>
+<style>
+  /* ===== 配色（確定HEX・§1） ===== */
+  :root{
+    --bg:#ffffff;
+    --remain-bg:#e8eef0;     /* 残額カード背景 */
+    --remain-num:#1f3942;    /* 残額の数字（主役・最大コントラスト） */
+    --remain-sub1:#3a5560;   /* 残額の補助文字 */
+    --remain-sub2:#6a838c;   /* ラベル・更新時刻 */
+    --pace-bg:#f3efe6;       /* 今日の目安カード背景（オートミール） */
+    --pace-num:#5c4f2c;      /* 目安の数字 */
+    --pace-sub1:#7a6a3f;
+    --pace-sub2:#8a7a4f;
+    --bar-track:#e3e0d6;     /* 内訳バー（溝） */
+    --over-bg:#efe9e6;       /* 予算こえ月カード背景（赤ではない暖色） */
+    --over-t1:#5a4a42;       /* 予算こえ月の文字 */
+    --over-t2:#7a6a62;
+    --key-bg:#eef2f3;        /* PIN数字キー */
+    --key-t:#1f3942;
+    --stale:#9a7b2e;         /* 鮮度切れ＝控えめなアンバー文字 */
+    --line:#dfe5e7;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+    color:var(--remain-num);
+    -webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .wrap{max-width:440px;margin:0 auto;padding:18px 16px 40px;}
+  .hidden{display:none !important;}
+
+  /* ===== 共通カード ===== */
+  .card{border-radius:18px;padding:20px;margin-bottom:17px;}
+
+  /* ===== 残額カード ===== */
+  .remain{background:var(--remain-bg);}
+  .remain .lead{font-size:15px;color:var(--remain-sub1);margin:0 0 6px;}
+  .remain .num{font-size:46px;font-weight:500;color:var(--remain-num);line-height:1.05;letter-spacing:-0.5px;margin:0;}
+  .remain .tail{font-size:16px;color:var(--remain-sub1);margin:6px 0 0;}
+  .remain .updated{font-size:12px;color:var(--remain-sub2);margin:14px 0 0;}
+  .remain .updated.stale{color:var(--stale);}
+
+  /* 予算こえ（残額マイナス）差し替え */
+  .over{background:var(--over-bg);}
+  .over .lead{font-size:15px;color:var(--over-t1);margin:0 0 6px;}
+  .over .num{font-size:40px;font-weight:500;color:var(--over-t1);line-height:1.05;letter-spacing:-0.5px;margin:0;}
+  .over .over-word{font-size:16px;color:var(--over-t1);margin:6px 0 0;white-space:nowrap;}
+  .over .note{font-size:14px;color:var(--over-t2);margin:10px 0 0;}
+  .over .updated{font-size:12px;color:var(--over-t2);margin:14px 0 0;}
+  .over .updated.stale{color:var(--stale);}
+
+  /* 予算未設定 差し替え */
+  .nobudget{background:var(--remain-bg);}
+  .nobudget .t1{font-size:18px;font-weight:500;color:var(--remain-num);margin:0 0 8px;}
+  .nobudget .t2{font-size:14px;color:var(--remain-sub1);margin:0;}
+  .nobudget .updated{font-size:12px;color:var(--remain-sub2);margin:14px 0 0;}
+  .nobudget .updated.stale{color:var(--stale);}
+
+  /* ===== 今日のペース目安カード ===== */
+  .pace{background:var(--pace-bg);}
+  .pace .label{font-size:13px;color:var(--pace-sub1);margin:0 0 6px;}
+  .pace .num{font-size:30px;font-weight:500;color:var(--pace-num);line-height:1.1;margin:0;}
+  .pace .days{font-size:14px;color:var(--pace-sub1);margin:8px 0 0;}
+  .pace .reveal{font-size:12px;color:var(--pace-sub2);margin:8px 0 0;line-height:1.5;}
+
+  /* ===== 内訳（折り畳み） ===== */
+  .fold{border:1px solid var(--line);border-radius:18px;margin-bottom:17px;overflow:hidden;}
+  .fold > summary{
+    list-style:none;cursor:pointer;padding:16px 20px;font-size:14px;color:var(--remain-sub1);
+    display:flex;align-items:center;justify-content:space-between;min-height:44px;
+  }
+  .fold > summary::-webkit-details-marker{display:none;}
+  .fold > summary .chev{transition:transform .2s;color:var(--remain-sub2);font-size:13px;}
+  .fold[open] > summary .chev{transform:rotate(180deg);}
+  .fold .body{padding:4px 20px 20px;}
+  .row{display:flex;justify-content:space-between;font-size:14px;color:var(--remain-sub1);padding:7px 0;}
+  .row .v{color:var(--remain-num);}
+  .barrow{margin:12px 0 0;}
+  .barrow .head{display:flex;justify-content:space-between;font-size:13px;color:var(--remain-sub1);margin:0 0 5px;}
+  .barrow .head .v{color:var(--remain-num);}
+  .track{height:9px;border-radius:5px;background:var(--bar-track);overflow:hidden;}
+  .fill{height:100%;border-radius:5px;}
+
+  /* ===== PIN画面 ===== */
+  .pin{padding-top:40px;text-align:center;}
+  .pin h1{font-size:19px;font-weight:500;color:var(--remain-num);margin:0 0 10px;}
+  .pin .note{font-size:16px;color:var(--remain-sub1);line-height:1.55;margin:0 auto 28px;max-width:300px;}
+  .pin .note b{color:var(--remain-num);font-weight:600;}
+  .dots{display:flex;justify-content:center;gap:18px;margin:0 0 8px;height:22px;}
+  .dot{width:15px;height:15px;border-radius:50%;border:2px solid var(--remain-sub2);background:transparent;transition:background .12s;}
+  .dot.on{background:var(--remain-num);border-color:var(--remain-num);}
+  .retry{font-size:15px;color:var(--remain-sub1);height:24px;margin:8px 0 4px;}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:300px;margin:18px auto 0;}
+  .key{
+    height:62px;border:none;border-radius:14px;background:var(--key-bg);color:var(--key-t);
+    font-size:26px;font-weight:500;cursor:pointer;font-family:inherit;
+    display:flex;align-items:center;justify-content:center;user-select:none;
+  }
+  .key:active{background:#e0e7e9;}
+  .key.blank{background:transparent;cursor:default;}
+  .key.back{font-size:22px;}
+  .help{font-size:13px;color:var(--remain-sub2);margin:30px 0 0;}
+
+  /* ===== 成功トースト ===== */
+  .toast{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:var(--remain-bg);color:var(--remain-num);
+    padding:22px 30px;border-radius:16px;font-size:18px;font-weight:500;
+    box-shadow:0 8px 30px rgba(31,57,66,.18);z-index:50;text-align:center;
+  }
+
+  /* ===== 読み込み中 ===== */
+  .loading{padding-top:80px;text-align:center;color:var(--remain-sub2);font-size:15px;}
+  .spinner{
+    width:26px;height:26px;border-radius:50%;
+    border:3px solid var(--bar-track);border-top-color:var(--remain-sub2);
+    margin:0 auto 16px;animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ダーク端末でも背景は白・コントラスト維持（仕様：可読性優先・固定配色） */
+  @media (prefers-color-scheme: dark){
+    html,body{background:#ffffff;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- (B) 読み込み中 -->
+  <div id="view-loading" class="loading">
+    <div class="spinner"></div>
+    よみこみ中…
+  </div>
+
+  <!-- (A)(C) PIN入力 -->
+  <div id="view-pin" class="pin hidden">
+    <h1>あいことば</h1>
+    <p class="note">入れるのは<b>最初の1回だけ</b>。<br>次からは自動で開くよ</p>
+    <div class="dots" id="dots">
+      <span class="dot"></span><span class="dot"></span>
+      <span class="dot"></span><span class="dot"></span>
+      <span class="dot"></span><span class="dot"></span>
+      <span class="dot"></span><span class="dot"></span>
+    </div>
+    <div class="retry" id="retry"></div>
+    <div class="pad" id="pad">
+      <button class="key" data-k="1">1</button>
+      <button class="key" data-k="2">2</button>
+      <button class="key" data-k="3">3</button>
+      <button class="key" data-k="4">4</button>
+      <button class="key" data-k="5">5</button>
+      <button class="key" data-k="6">6</button>
+      <button class="key" data-k="7">7</button>
+      <button class="key" data-k="8">8</button>
+      <button class="key" data-k="9">9</button>
+      <span class="key blank"></span>
+      <button class="key" data-k="0">0</button>
+      <button class="key back" data-k="back" aria-label="けす">⌫</button>
+    </div>
+    <p class="help">分からなくなったら、つよしに聞いてね</p>
+  </div>
+
+  <!-- 解錠後の主画面 -->
+  <div id="view-home" class="hidden">
+
+    <!-- 残額カード（通常） -->
+    <div id="card-remain" class="card remain">
+      <p class="lead">今月、あと</p>
+      <p class="num" id="remain-num">¥0</p>
+      <p class="tail">使えるよ</p>
+      <p class="updated" id="remain-updated"></p>
+    </div>
+
+    <!-- 残額カード（予算こえ＝マイナス差し替え） -->
+    <div id="card-over" class="card over hidden">
+      <p class="lead">今月は予算を</p>
+      <p class="num" id="over-num">¥0</p>
+      <p class="over-word">こえています</p>
+      <p class="note">今月はここまで。来月またペースを見ましょう</p>
+      <p class="updated" id="over-updated"></p>
+    </div>
+
+    <!-- 残額カード（予算未設定 差し替え） -->
+    <div id="card-nobudget" class="card nobudget hidden">
+      <p class="t1">今月の予算がまだ入っていません</p>
+      <p class="t2">つよしが用意しています。少し待ってね</p>
+      <p class="updated" id="nobudget-updated"></p>
+    </div>
+
+    <!-- 今日のペース目安カード -->
+    <div id="card-pace" class="card pace hidden">
+      <p class="label">今日のペース目安</p>
+      <p class="num" id="pace-num">1日 ¥0 くらい</p>
+      <p class="days" id="pace-days">のこり0日</p>
+      <p class="reveal" id="pace-reveal">残りを日数で割った数だから、使うと次の日に変わるよ</p>
+    </div>
+
+    <!-- 内訳（折り畳み・既定は閉じ） -->
+    <details id="card-fold" class="fold hidden">
+      <summary>内訳を見る<span class="chev">▼</span></summary>
+      <div class="body">
+        <div class="row"><span>今月の予算</span><span class="v" id="f-budget">¥0</span></div>
+        <div class="row"><span>これまで使った</span><span class="v" id="f-spent">¥0</span></div>
+        <div id="f-bars"></div>
+      </div>
+    </details>
+
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+// ===== 暗号パラメータ（生成.mjs と exact 一致） =====
+const PBKDF2_ITER = 600000;
+const PBKDF2_HASH = "SHA-256";
+const LS_KEY = "kakeibo_pin_v1"; // localStorage に記憶するPIN（この端末・このブラウザでのみ）
+
+const $ = id => document.getElementById(id);
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function show(view){
+  for(const id of ["view-loading","view-pin","view-home"]){
+    $(id).classList.toggle("hidden", id !== view);
+  }
+}
+
+// ---- base64 -> Uint8Array ----
+function b64ToBytes(b64){
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+// ---- 鍵導出（生成.mjs と exact 一致） ----
+async function deriveKey(pin, salt){
+  const baseKey = await crypto.subtle.importKey(
+    "raw", enc.encode(pin), { name:"PBKDF2" }, false, ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name:"PBKDF2", salt, iterations:PBKDF2_ITER, hash:PBKDF2_HASH },
+    baseKey,
+    { name:"AES-GCM", length:256 },
+    false,
+    ["encrypt","decrypt"]
+  );
+}
+
+// ---- 復号。失敗（誤PIN）は例外 ----
+async function decrypt(pin, payload){
+  const salt = b64ToBytes(payload.salt);
+  const iv   = b64ToBytes(payload.iv);
+  const ct   = b64ToBytes(payload.ct);
+  const key  = await deriveKey(pin, salt);
+  const pt   = await crypto.subtle.decrypt({ name:"AES-GCM", iv }, key, ct);
+  return JSON.parse(dec.decode(pt));
+}
+
+// ---- 金額フォーマット（円・カンマ） ----
+function yen(n){
+  return "¥" + Math.round(n).toLocaleString("ja-JP");
+}
+
+// ---- 相対更新表記（§6・端末時計 vs generatedAt） ----
+// 戻り: { text, stale }  stale=3日超
+function freshness(generatedAtISO){
+  const g = new Date(generatedAtISO);
+  const now = new Date();
+  // 日付（ローカル0時基準）の差で「◯日前」を数える
+  const gd = new Date(g.getFullYear(), g.getMonth(), g.getDate());
+  const nd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayDiff = Math.round((nd - gd) / 86400000);
+  const hh = g.getHours();
+  const mm = String(g.getMinutes()).padStart(2,"0");
+  const stale = dayDiff > 3; // 社長決定：3日超で「◯日前の情報です」
+
+  if(stale){
+    return { text: dayDiff + "日前の情報です", stale:true };
+  }
+  if(dayDiff <= 0){
+    return { text: "今日 " + hh + ":" + mm + " に更新", stale:false };
+  }
+  if(dayDiff === 1){
+    return { text: "昨日 更新", stale:false };
+  }
+  // 2〜3日前（鮮度切れ閾値内）
+  return { text: dayDiff + "日前 更新", stale:false };
+}
+
+// バー色（彩度を抑えた同系・色で良し悪しを示さない・§1）
+const BAR_COLORS = ["#9bb0b6","#c2b48a","#a9a99e","#aab6a0","#b6a9b0","#a0b0b6"];
+
+// ===== 解錠後の描画 =====
+function render(s){
+  show("view-home");
+
+  // 更新表記（全カード共通で使う）
+  const fr = freshness(s.generatedAt);
+
+  // --- 分岐：予算未設定 / マイナス / 通常 ---
+  const remainCard = $("card-remain");
+  const overCard = $("card-over");
+  const noBudgetCard = $("card-nobudget");
+  const paceCard = $("card-pace");
+  const foldCard = $("card-fold");
+
+  remainCard.classList.add("hidden");
+  overCard.classList.add("hidden");
+  noBudgetCard.classList.add("hidden");
+  paceCard.classList.add("hidden");
+  foldCard.classList.add("hidden");
+
+  function setUpdated(elId){
+    const el = $(elId);
+    el.textContent = fr.text;
+    el.classList.toggle("stale", fr.stale);
+  }
+
+  if(!s.budgetSet){
+    // (D) 予算未設定：金額を一切出さない
+    noBudgetCard.classList.remove("hidden");
+    setUpdated("nobudget-updated");
+    return;
+  }
+
+  const remaining = s.remaining;
+
+  if(remaining < 0){
+    // (E) 残額マイナス＝予算こえ。符号−や赤を使わず正の数・言葉で
+    overCard.classList.remove("hidden");
+    $("over-num").textContent = yen(Math.abs(remaining));
+    setUpdated("over-updated");
+    // 目安カードは非表示（§4）。内訳は出す（予算・使った・費目バー）
+  } else {
+    // 通常：残額カード（主役）
+    remainCard.classList.remove("hidden");
+    $("remain-num").textContent = yen(remaining);
+    setUpdated("remain-updated");
+
+    // 今日のペース目安（残額÷残り日数・100円丸め）
+    // 鮮度切れ（3日超）の時は隠す：古い残り日数で割った目安を「今日の」と出さない＝安全側（CLAUDE.md §9）
+    if(!fr.stale){
+      paceCard.classList.remove("hidden");
+      const days = s.daysLeft;
+      const revealEl = $("pace-reveal");
+      if(days <= 1){
+        // 最終日：割らずに言葉で。割り算してないので種明かし文は消す
+        $("pace-num").textContent = "今日が今月最後の日";
+        $("pace-days").textContent = "のこり1日";
+        if(revealEl) revealEl.classList.add("hidden");
+      } else {
+        const pace = Math.round(remaining / days / 100) * 100;
+        $("pace-num").textContent = "1日 " + yen(pace) + " くらい";
+        $("pace-days").textContent = "のこり" + days + "日";
+        if(revealEl) revealEl.classList.remove("hidden");
+      }
+    }
+  }
+
+  // --- 内訳（折り畳み・予算/使った/費目バー） ---
+  foldCard.classList.remove("hidden");
+  $("f-budget").textContent = yen(s.budget);
+  $("f-spent").textContent = yen(s.spent);
+
+  const barsEl = $("f-bars");
+  barsEl.innerHTML = "";
+  const bars = Array.isArray(s.byCat) ? s.byCat : [];
+  const maxAmt = bars.reduce((mx,b)=>Math.max(mx, b.amount), 0) || 1;
+  bars.forEach((b, i)=>{
+    if(!b.amount || b.amount <= 0) return; // 0円は出さない
+    const wrap = document.createElement("div");
+    wrap.className = "barrow";
+    const head = document.createElement("div");
+    head.className = "head";
+    const left = document.createElement("span");
+    left.textContent = (b.icon ? b.icon + " " : "") + b.name;
+    const right = document.createElement("span");
+    right.className = "v";
+    right.textContent = yen(b.amount);
+    head.appendChild(left); head.appendChild(right);
+    const track = document.createElement("div");
+    track.className = "track";
+    const fill = document.createElement("div");
+    fill.className = "fill";
+    fill.style.width = Math.max(4, Math.round(b.amount / maxAmt * 100)) + "%";
+    fill.style.background = BAR_COLORS[i % BAR_COLORS.length];
+    track.appendChild(fill);
+    wrap.appendChild(head); wrap.appendChild(track);
+    barsEl.appendChild(wrap);
+  });
+}
+
+// ===== 成功トースト → 主画面 =====
+function successToast(then){
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = "✓ 覚えたよ。次から自動で開きます";
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.remove(); then(); }, 1100);
+}
+
+// ===== PIN入力UI =====
+let pinBuf = "";
+let payload = null;     // 暗号文（data.json）
+let busy = false;
+
+function drawDots(){
+  const dots = $("dots").children;
+  for(let i=0;i<8;i++) dots[i].classList.toggle("on", i < pinBuf.length);
+}
+
+function resetPin(msg){
+  pinBuf = "";
+  drawDots();
+  $("retry").textContent = msg || "";
+}
+
+// busy は呼び出し側（onKey / init）で必ず立てる。ここでは触らず、終了時のみ解除する。
+// 復号は重い（PBKDF2 60万回）ので、その最中のキー入力は onKey の busy ガードで確実に無視する。
+async function tryPin(pin, rememberOnSuccess){
+  try{
+    const s = await decrypt(pin, payload);
+    // 成功：busy は立てたまま（以後の入力を無視）→ 画面遷移で確定
+    if(rememberOnSuccess){
+      try{ localStorage.setItem(LS_KEY, pin); }catch(e){}
+      successToast(()=> render(s));
+    } else {
+      render(s);
+    }
+  }catch(e){
+    // (C) PIN間違い：再入力できるよう busy 解除
+    busy = false;
+    resetPin("もう一回どうぞ");
+    // 記憶が誤っていた場合は消す（手入力に戻す）
+    if(!rememberOnSuccess){
+      try{ localStorage.removeItem(LS_KEY); }catch(_){}
+    }
+  }
+}
+
+function onKey(k){
+  if(busy) return;          // 復号処理中（busy）はキー入力を確実に無視（取りこぼし・カウントずれ防止）
+  if(k === "back"){
+    pinBuf = pinBuf.slice(0,-1);
+    drawDots();
+    return;
+  }
+  if(pinBuf.length >= 8) return;
+  pinBuf += k;
+  drawDots();
+  if(pinBuf.length === 8){
+    // 8桁目で自動判定（決定ボタン無し）。先に busy を立ててから復号開始＝以後の入力を遮断
+    busy = true;
+    tryPin(pinBuf, true);
+  }
+}
+
+$("pad").addEventListener("click", (e)=>{
+  const btn = e.target.closest("[data-k]");
+  if(!btn) return;
+  onKey(btn.getAttribute("data-k"));
+});
+
+// ===== 起動 =====
+(async function init(){
+  show("view-loading");
+  // data.json を取得
+  try{
+    const res = await fetch("data.json", { cache:"no-store" });
+    if(!res.ok) throw new Error("fetch失敗");
+    payload = await res.json();
+  }catch(e){
+    // データが無い時は PIN画面で待つ（読み込み案内）
+    show("view-pin");
+    $("retry").textContent = "データを読み込めません。つよしに聞いてね";
+    return;
+  }
+
+  // 記憶PIN（この端末で1回成功済み）があれば自動解錠
+  let saved = null;
+  try{ saved = localStorage.getItem(LS_KEY); }catch(_){}
+  if(saved && /^\d{8}$/.test(saved)){
+    busy = true;                // 自動解錠の復号中もキー入力を遮断（PIN画面が一瞬出ても無視）
+    await tryPin(saved, false); // 自動：成功なら主画面、失敗なら記憶を消してPIN画面
+    if(!$("view-home").classList.contains("hidden")) return; // 解錠済み
+    // 失敗時：tryPin 内で busy=false 済み。手入力に戻す
+  }
+
+  // PIN入力へ
+  show("view-pin");
+  resetPin("");
+  drawDots();
+})();
+</script>
+</body>
+</html>
